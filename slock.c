@@ -19,6 +19,7 @@
 #include <X11/keysym.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xresource.h>
 
 #include "arg.h"
 #include "util.h"
@@ -223,6 +224,25 @@ readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
 	}
 }
 
+static void
+readxresources(Display *dpy)
+{
+	static const char *names[NUMCOLS] = {
+		[INIT] = "slock.init", [INPUT] = "slock.input", [FAILED] = "slock.failed",
+	};
+	char *rms, *type;
+	XrmDatabase db;
+	XrmValue v;
+	int i;
+
+	XrmInitialize();
+	if (!(rms = XResourceManagerString(dpy)) || !(db = XrmGetStringDatabase(rms)))
+		return;
+	for (i = 0; i < NUMCOLS; i++)
+		if (XrmGetResource(db, names[i], names[i], &type, &v))
+			colorname[i] = v.addr;
+}
+
 static struct lock *
 lockscreen(Display *dpy, struct xrandr *rr, int screen)
 {
@@ -358,6 +378,8 @@ main(int argc, char **argv) {
 		die("slock: setgid: %s\n", strerror(errno));
 	if (setuid(duid) < 0)
 		die("slock: setuid: %s\n", strerror(errno));
+
+	readxresources(dpy);
 
 	/* check for Xrandr support */
 	rr.active = XRRQueryExtension(dpy, &rr.evbase, &rr.errbase);
